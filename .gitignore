@@ -1,0 +1,5 @@
+*.ini
+rtsp-rtp-stream/
+.idea/
+*.pyc
+__pycsche__/
