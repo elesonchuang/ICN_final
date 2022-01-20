@@ -3,3 +3,6 @@ rtsp-rtp-stream/
 .idea/
 *.pyc
 __pycsche__/
+*.mp4
+*.mov
+*.avi
