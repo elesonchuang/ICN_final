@@ -1,8 +1,7 @@
 import socket
-
 from rtsp_packet import RTSPPacket 
 class Client:
-    def __init__(self, server_ip, server_port, rtp_port, filepath):
+    def __init__(self, server_ip:str, server_port:int, rtp_port:int, filepath:str):
         self.server_ip = server_ip
         self.rtsp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.rtp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -16,17 +15,23 @@ class Client:
         self.session = 123456
         self.filepath = filepath
         self.has_start = False
+        self.is_play = False
+
     def rtsp_connect(self):
         if self.rtsp_connected: 
             print("already connected")
             return
         try:
             self.rtsp.connect((self.server_ip, self.server_port))
+            self.rtsp_connected = True
             print(f"connect to server: {self.server_ip}:{self.server_port}")
         except:
-            raise Exception(f'fail to connect to server: {self.server_ip}:{self.server_port}')
+            raise Exception(f'fail to connect rtsp server: {self.server_ip}:{self.server_port}')
     def rtp_connect(self):
-        self.rtp.bind()
+        try:
+            self.rtp.bind((self.server_ip, self.rtp_port))
+        except:
+            raise Exception(f"fail to connect rtp server: {self.server_ip}:{self.rtp_port}")
 
     def send_rtsp_request(self, request):
         '''
@@ -35,7 +40,7 @@ class Client:
         if request not in self.option:
             print("invalid rtsp request")
             return
-        request_to_send = RTSPPacket(request, self.filepath, self.rtsp_seqnum).requst_formatter()
+        request_to_send = RTSPPacket(request, self.filepath, self.rtsp_seqnum, self.rtp_port).request_formatter()
         print(f"sending: {request_to_send.encode()}")
         self.rtsp.send(request_to_send.encode())
         self.rtsp_seqnum += 1
@@ -61,9 +66,12 @@ class Client:
                 break
             except socket.timeout:
                 pass
-        print(temp)
+        print(RTSPPacket.response_parser(temp))
+
         return temp
     
 if __name__ == "__main__":
-     Client("127.0.0.1", 5540, 5541, "test.py")
+    c = Client("127.0.0.1", 5540, 5541, "movie.mjpeg")
+    c.rtsp_connect()
+    c.send_setup()
 

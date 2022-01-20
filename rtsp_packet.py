@@ -42,7 +42,7 @@ class RTSPPacket:
             print("fail to parse request...")
             return
         dic = match.groupdict()
-        return dic
+        return self(dic["request_type"], dic["video_file_path"], dic["sequence_number"], dic["dst_port"])
     @classmethod
     def response_parser(self, response:bytes) -> dict: 
         match = re.match(
@@ -55,7 +55,7 @@ class RTSPPacket:
             print("fail to parse response...")
             return 
         dic = match.groupdict()
-        return dic
+        return self(dic["request_type"], dic["video_file_path"], dic["sequence_number"], dic["dst_port"])
 
 
 if __name__ == "__main__":
@@ -69,6 +69,6 @@ if __name__ == "__main__":
         )
     #print(match.groupdict())
     r = RTSPPacket("SETUP", "test.py", 0, 2000).request_formatter().encode()
-    print(r.decode())
-    RTSPPacket.request_parser(r)
+    print(RTSPPacket.request_parser(r))
+
 
