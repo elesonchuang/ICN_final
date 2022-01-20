@@ -1,5 +1,7 @@
 import socket
 from rtsp_packet import RTSPPacket 
+import sys
+from rtp_packet import RTPPacket
 class Client:
     def __init__(self, server_ip:str, server_port:int, rtp_port:int, filepath:str):
         self.server_ip = server_ip
@@ -13,10 +15,9 @@ class Client:
         self.option = ["SETUP", "TEARDOWN", "PLAY", "PAUSE"]
         self.rtsp_seqnum = 0
         self.session = 123456
-        self.filepath = filepath
+        self.filepath = open(filepath, "wb")
         self.has_start = False
         self.is_play = False
-
     def rtsp_connect(self):
         if self.rtsp_connected: 
             print("already connected")
@@ -69,9 +70,21 @@ class Client:
         print(RTSPPacket.response_parser(temp))
 
         return temp
-    
+    def get_data(self):
+        temp = None
+        while True:
+            try:
+                temp = self.rtp.recv(4096)
+                break
+            except socket.timeout:
+                pass
+        if temp:
+            payload = RTPPacket.get_packet_from_bytes(temp).payload
+            self.filepath.write(payload)
+
+            
 if __name__ == "__main__":
-    c = Client("127.0.0.1", 5540, 5541, "movie.mjpeg")
+    c = Client("127.0.0.1", 5540, 5541, "1.mp4")
     c.rtsp_connect()
     c.send_setup()
 

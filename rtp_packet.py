@@ -55,4 +55,4 @@ if __name__ == "__main__":
     p = RTPPacket(sequence_num=0, time_stamp=123, payload=b'hello world')
     print(p.get_packet())
     pr = RTPPacket.get_packet_from_bytes(p.get_packet())
-    print(pr.M)
+    print(pr.payload)

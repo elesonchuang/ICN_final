@@ -24,9 +24,9 @@ class RTSPPacket:
             return f"{self.request_type} rtsp://{self.filepath} RTSP/1.0\nCSeq: {self.sequence_num}\nSession: {self.session}\n"
             
 
-    def response_formatter(self, sequence_num, session = 123456):
+    def response_formatter(self, session = 123456):
         return (
-        f"RTSP/1.0 200 OK\nCSeq: {sequence_num}\nSession: {session}\n"
+        f"RTSP/1.0 200 OK\nCSeq: {self.sequence_num}\nSession: {session}\n"
         )
     @classmethod
     def request_parser(self, request:bytes) -> dict:
