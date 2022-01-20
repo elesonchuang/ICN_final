@@ -29,7 +29,7 @@ class RTSPPacket:
         f"RTSP/1.0 200 OK\nCSeq: {sequence_num}\nSession: {session}\n"
         )
     @classmethod
-    def request_parser(self, request:bytes):
+    def request_parser(self, request:bytes) -> dict:
         match = re.match(
             r"(?P<request_type>\w+) rtsp://(?P<video_file_path>\S+) (?P<rtsp_version>RTSP/\d+.\d+)\r?\n"
             r"CSeq: (?P<sequence_number>\d+)\r?\n"
@@ -41,6 +41,19 @@ class RTSPPacket:
         if not match:
             print("fail to parse request...")
             return
+        dic = match.groupdict()
+        return dic
+    @classmethod
+    def response_parser(self, response:bytes) -> dict: 
+        match = re.match(
+            r"(?P<rtsp_version>RTSP/\d+.\d+) 200 OK\r?\n"
+            r"CSeq: (?P<sequence_number>\d+)\r?\n"
+            r"Session: (?P<session_id>\d+)\r?\n",
+            response.decode()
+        )
+        if not match:
+            print("fail to parse response...")
+            return 
         dic = match.groupdict()
         return dic
 
