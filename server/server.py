@@ -9,13 +9,7 @@ from packet.rtp_packet import RTPPacket
 
 class Server:
     DEFAULT_CHUNK_SIZE = 4096
-
-    class STATE:
-        INIT = 0
-        PAUSED = 1
-        PLAYING = 2
-        FINISHED = 3
-        TEARDOWN = 4
+    FRAME_SIZE = 4096
 
     def __init__(self, Port, Host):
         self.port = Port
@@ -23,8 +17,8 @@ class Server:
         self.connection: Union[None, socket.socket] = None
         self.rtp_socket: Union[None, socket.socket] = None
         self.client_address = None
-        self.state = self.STATE.INIT
-        self.vedio_file_path = None
+        self.state = 'INIT'
+        self.source_file = open("videoplayback.mp4", "rb")
 
     def connect_client(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -38,13 +32,13 @@ class Server:
             f"Accepted connection from {self.client_address[0]}:{self.client_address[1]}")
 
     def setup(self):
-        if self.state == self.STATE.INIT:
+        if self.state == "INIT":
             raise Exception('server is already setup')
         while True:
             rtsp_packet = self.rtsp_recv()
             # TODO
             if rtsp_packet.request_type == 'SETUP':
-                self.server_state = self.STATE.PAUSED
+                self.server_state = "PAUSED"
                 print('State set to PAUSED')
                 self.client_address = self.client_address[0], rtsp_packet.rtp_port
                 self.setup_rtp(rtsp_packet.filepath)
@@ -76,32 +70,35 @@ class Server:
     def handle_video_send(self):
         print(
             f"Sending video to {self.client_address[0]}:{self.client_address[1]}")
+        buffer = self.source_file.read()
+        l = 0
+        w = 0
         while True:
-            if self.server_state == self.STATE.TEARDOWN:
+            if self.server_state == 'TEARDOWN' or self.server_state == 'FINISH':
                 return
-            if self.server_state != self.STATE.PLAYING:
+            if self.server_state != 'PLAYING':
                 sleep(0.5)  # diminish cpu hogging
                 continue
             # TODO
-            if self._video_stream.current_frame_number >= VideoStream.VIDEO_LENGTH-1:  # frames are 0-indexed
-                print('Reached end of file.')
-                self.server_state = self.STATE.FINISHED
-                return
-            frame = self._video_stream.get_next_frame()
-            frame_number = self._video_stream.current_frame_number
+            payload = buffer[l:l+self.FRAME_SIZE]
+            l += self.FRAME_SIZE
+            # print(w)
+            w += 1
             rtp_packet = RTPPacket(
                 payload_type=26,
-                sequence_num=frame_number,
-                timestamp=frame_number*self.FRAME_PERIOD,
-                payload=frame
+                sequence_num=l,
+                time_stamp=123,
+                payload=payload
             )
-
-            print(f"Sending packet #{frame_number}")
+            print(f"Sending packet #{l}")
             print('Packet header:')
-            rtp_packet.print_header()
+            # rtp_packet.print_header()
             packet = rtp_packet.get_packet()
             self.send_rtp_packet(packet)
-            sleep(self.FRAME_PERIOD/1000.)
+            sleep(0.0001)
+            if l > len(buffer):
+                self.state = "FINISH"
+
             # TODO FINISH
 
     def send_rtp_packet(self, packet):
@@ -121,30 +118,25 @@ class Server:
             packet = self.rtsp_recv()
             # assuming state will only ever be PAUSED or PLAYING at this point
             if packet.request_type == "PLAY":
-                if self.server_state == self.STATE.PLAYING:
+                if self.server_state == 'PLAYING':
                     print('Current state is already PLAYING.')
                     continue
-                self.server_state = self.STATE.PLAYING
+                self.server_state = 'PLAYING'
                 print('State set to PLAYING.')
             elif packet.request_type == "PAUSE":
-                if self.server_state == self.STATE.PAUSED:
+                if self.server_state == 'PAUSED':
                     print('Current state is already PAUSED.')
                     continue
-                self.server_state = self.STATE.PAUSED
+                self.server_state = 'PAUSED'
                 print('State set to PAUSED.')
             elif packet.request_type == "TEARDOWN":
                 print('Received TEARDOWN request, shutting down...')
                 self.send_rtsp_response(packet)
                 self.connection.close()
-                # TODO
-                self._video_stream.close()
                 self.rtp_socket.close()
-                self.server_state = self.STATE.TEARDOWN
-                # for simplicity's sake, caught on main_server
+                self.server_state = 'TEARDOWN'
                 raise ConnectionError('teardown requested')
             else:
-                # will never happen, since exception is raised inside `parse_rtsp_request()`
-                # raise InvalidRTSPRequest()
                 pass
             self.send_rtsp_response(packet)
 
