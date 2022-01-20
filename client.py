@@ -3,7 +3,7 @@ from rtsp_packet import RTSPPacket
 import sys
 from rtp_packet import RTPPacket
 class Client:
-    def __init__(self, server_ip:str, server_port:int, rtp_port:int, filepath:str):
+    def __init__(self, server_ip: str, server_port: int, rtp_port: int, filepath: str):
         self.server_ip = server_ip
         self.rtsp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.rtp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -19,7 +19,7 @@ class Client:
         self.has_start = False
         self.is_play = False
     def rtsp_connect(self):
-        if self.rtsp_connected: 
+        if self.rtsp_connected:
             print("already connected")
             return
         try:
@@ -27,12 +27,15 @@ class Client:
             self.rtsp_connected = True
             print(f"connect to server: {self.server_ip}:{self.server_port}")
         except:
-            raise Exception(f'fail to connect rtsp server: {self.server_ip}:{self.server_port}')
+            raise Exception(
+                f'fail to connect rtsp server: {self.server_ip}:{self.server_port}')
+
     def rtp_connect(self):
         try:
             self.rtp.bind((self.server_ip, self.rtp_port))
         except:
-            raise Exception(f"fail to connect rtp server: {self.server_ip}:{self.rtp_port}")
+            raise Exception(
+                f"fail to connect rtp server: {self.server_ip}:{self.rtp_port}")
 
     def send_rtsp_request(self, request):
         '''
@@ -41,7 +44,8 @@ class Client:
         if request not in self.option:
             print("invalid rtsp request")
             return
-        request_to_send = RTSPPacket(request, self.filepath, self.rtsp_seqnum, self.rtp_port).request_formatter()
+        request_to_send = RTSPPacket(
+            request, self.filepath, self.rtsp_seqnum, self.rtp_port).request_formatter()
         print(f"sending: {request_to_send.encode()}")
         self.rtsp.send(request_to_send.encode())
         self.rtsp_seqnum += 1
@@ -50,15 +54,19 @@ class Client:
     def send_setup(self):
         self.send_rtsp_request("SETUP")
         self.has_start = True
+
     def send_play(self):
         self.send_rtsp_request("PLAY")
         self.has_play = True
+
     def send_pause(self):
         self.send_rtsp_request("PAUSE")
         self.has_play = False
+
     def send_teardown(self):
         self.send_rtsp_request("TEARDOWN")
         self.has_start = False
+
     def get_response(self):
         temp = None
         while True:
@@ -87,4 +95,3 @@ if __name__ == "__main__":
     c = Client("127.0.0.1", 5540, 5541, "1.mp4")
     c.rtsp_connect()
     c.send_setup()
-
