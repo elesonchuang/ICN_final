@@ -1,15 +1,16 @@
 import socket
 from packet.rtsp_packet import RTSPPacket 
-import sys
 from packet.rtp_packet import RTPPacket
 from threading import Thread
-import time
+import cv2
+from io import BytesIO
+import numpy as np
 class Client:
     def __init__(self, server_ip: str, server_port: int, rtp_port: int, filepath: str):
         self.server_ip = server_ip
         self.rtsp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.rtp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.rtp.settimeout(0.05)
+        #self.rtp.settimeout(20)
         self.rtsp.settimeout(0.1)
         self.server_port = server_port
         self.rtsp_connected = False
@@ -18,13 +19,13 @@ class Client:
         self.rtsp_seqnum = 0
         self.session = 123456
         self.filepath = filepath
-        self.tempfilepath = "temp."+ self.filepath.split('.')[1]
-        self.tempfile = open(self.tempfilepath, 'wb')
+        if filepath != "stream":self.tempfilepath = "temp."+ self.filepath.split('.')[1]
+        if filepath != "stream":self.tempfile = open(self.tempfilepath, 'wb')
         self.has_start = False
         self.is_play = False
         self._rtp_receive_thread = None
-        self.count = 0
-        self.seq = -1
+        self.frame_buffer = []
+        self.byte_buffer = []
     def rtsp_connect(self):
         if self.rtsp_connected:
             print("already connected")
@@ -37,6 +38,7 @@ class Client:
             raise Exception(
                 f'fail to connect rtsp server: {self.server_ip}:{self.server_port}')
     def _start_rtp_receive_thread(self):
+        #print("thread")
         self._rtp_receive_thread = Thread(target=self.rtp_connect)
         self._rtp_receive_thread.setDaemon(True)
         self._rtp_receive_thread.start()
@@ -49,9 +51,6 @@ class Client:
             raise Exception(
                 f"fail to connect rtp server: {self.server_ip}:{self.rtp_port}")
         while True:
-            if not self.is_play:
-                time.sleep(0.1)  # diminish cpu hogging
-                continue
             self.get_data()
 
     def send_rtsp_request(self, request):
@@ -93,26 +92,41 @@ class Client:
                 break
             except socket.timeout:
                 pass
-        print(RTSPPacket.response_parser(temp))
+        #print(RTSPPacket.response_parser(temp))
 
         return temp
     def get_data(self):
         temp = None
-        while True:
-            try:
-                temp = self.rtp.recv(9192)
-                break
-            except socket.timeout:
-                pass
-        if temp:    
-            payload = RTPPacket.get_packet_from_bytes(temp).payload
-            seq = RTPPacket.get_packet_from_bytes(temp).sequence_num
-            if seq - self.seq  != 1:print(seq)
-            self.seq = seq
-            self.tempfile.write(payload)
-            #print(len(payload))
+        #print("wating for data...")
+        try:
+            temp = self.rtp.recv(4096)
+        except socket.timeout:
+            pass
+        if temp:
+            if self.filepath == "stream":
+                payload = RTPPacket.get_packet_from_bytes(temp).payload
+                self.byte_buffer.append(payload)
+                if payload[-2:] == b"\xff\xd9":
+                    frame = b''.join(self.byte_buffer)
+                    #self.frame_buffer.append(frame)
+                    self.byte_buffer = []
+                    img_raw = frame
+                    io_buf = BytesIO(img_raw)
+                    frame = cv2.imdecode(np.frombuffer(io_buf.getbuffer(), np.uint8), 1)
+                    try:
+                        frame = cv2.resize(frame, (480, 360), interpolation=cv2.INTER_AREA)
+                        self.frame_buffer.append(frame)
+                    except:
+                        pass 
+            else:
+                self.tempfile.write(RTPPacket.get_packet_from_bytes(temp).payload)
+            #print(RTPPacket.get_packet_from_bytes(temp).sequence_num)
 
-            
+    def get_next_frame(self):
+        if self.frame_buffer:
+            return self.frame_buffer.pop(0)
+        return None
+    
 if __name__ == "__main__":
     c = Client("127.0.0.1", 5540, 5541, "1.mp4")
     #print(c.tempfilepath)

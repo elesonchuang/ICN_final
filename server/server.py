@@ -20,6 +20,8 @@ class Server:
         self.state = None
         self.source_file = None
 
+        #self.temfile = open("tempserver.mp4", "wb")
+
     def connect_client(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         address = (self.host, self.port)
@@ -79,31 +81,32 @@ class Server:
         w = 0
         while True:
             if self.state == 'TEARDOWN' or self.state == 'FINISH':
-                print(w)
                 return
             if self.state != 'PLAYING':
                 sleep(0.5)  # diminish cpu hogging
                 continue
             # TODO
             payload = buffer[l:l+self.FRAME_SIZE]
-            l += self.FRAME_SIZE
-            # print(w)
             
+            # print(w)
             rtp_packet = RTPPacket(
                 payload_type=26,
                 sequence_num=w,
                 time_stamp=123,
                 payload=payload
             )
-            if w % 100 == 0:print(f"Sending packet #{w} to packet #{w+99}")
-            print('Packet header:')
+            #print(w)
+            if w % 10 == 0:print(f"Sending packet #{w} to packet #{w+9}")
+            #print('Packet header:')
             # rtp_packet.print_header()
             #sleep(0.000001)
             packet = rtp_packet.get_packet()
+            #self.temfile.write(RTPPacket.get_packet_from_bytes(packet).payload)
             self.send_rtp_packet(packet)
             if l > len(buffer):
                 self.state = "FINISH"
             w += 1
+            l += self.FRAME_SIZE
             #
             # TODO FINISH
 
