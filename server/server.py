@@ -20,7 +20,7 @@ class Server:
         self.connection: Union[None, socket.socket] = None
         self.rtp_socket: Union[None, socket.socket] = None
         self.client_address = None
-        self.state = None
+        self.state = "INIT"
         self.source_file = None
         self.method = None
         self.cv = cv2.VideoCapture(2)
@@ -38,7 +38,7 @@ class Server:
             f"Accepted connection from {self.client_address[0]}:{self.client_address[1]}")
 
     def setup(self):
-        if self.state == "INIT":
+        if self.state != "INIT":
             raise Exception('server is already setup')
         while True:
             rtsp_packet = self.rtsp_recv()
@@ -177,6 +177,7 @@ class Server:
             io_buf.seek(0)
             buffer = io_buf.read()
             w = 0
+            l = 0
             while l <= len(buffer):
                 payload = buffer[l:l+self.CV_FRAME_SIZE]
                 rtp_packet = RTPPacket(
