@@ -14,7 +14,7 @@ class Server:
     FRAME_SIZE = 4096 - 12
     CV_FRAME_SIZE = 4096
 
-    def __init__(self, Host, Port, method):
+    def __init__(self, Host, Port):
         self.port = Port
         self.host = Host
         self.connection: Union[None, socket.socket] = None
@@ -25,7 +25,6 @@ class Server:
         self.method = None
         self.cv = cv2.VideoCapture(2)
 
-        #self.temfile = open("tempserver.mp4", "wb")
 
     def connect_client(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -69,8 +68,11 @@ class Server:
         return recv
 
     def setup_rtp(self, video_file_path: str):
-        print(f"Opening up video stream for file {video_file_path}")
-        self.source_file = open(video_file_path, "rb")
+        if video_file_path == "cv":
+            self.method = "cv"
+        else:
+            print(f"Opening up video stream for file {video_file_path}")
+            self.source_file = open(video_file_path, "rb")
         ##self._video_stream = VideoStream(video_file_path)
         print('Setting up RTP socket...')
         self.rtp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -106,9 +108,9 @@ class Server:
                 payload=payload
             )
             #sleep(0.1)
-            if w % 100 == 0:
-                print(f"Sending packet #{w} to packet #{w+99}")
-            print('Packet header:')
+            if w % 10 == 0:
+                print(f"Sending packet #{w} to packet #{w+9}")
+            #print('Packet header:')
             # rtp_packet.print_header()
             # sleep(0.000001)
             packet = rtp_packet.get_packet()
@@ -192,7 +194,7 @@ class Server:
                 sleep(1/100)
 
             sleep(0.1)
-            if w % 100 == 0:
-                print(f"Sending packet #{w} to packet #{w+99}")
+            if w % 10 == 0:
+                print(f"Sending packet #{w} to packet #{w+9}")
             print('Packet header:')
             w += 1
