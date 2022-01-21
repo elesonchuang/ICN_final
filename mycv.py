@@ -14,10 +14,12 @@ class Cap:
     def loop(self):
         while self.start:
             ret, frame = self.cap.read()
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            cv2.imshow("gray", frame)
-            cv2.imshow("qq", gray)
-            #time.sleep(0.05)
+            try:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                cv2.imshow("gray", gray)
+                #time.sleep(0.05)
+            except:
+                pass
             if cv2.waitKey(25) == ord("q"):
                 break
             

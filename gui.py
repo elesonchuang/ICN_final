@@ -10,7 +10,7 @@ import time
 from client import Client
 from mycv import Cap
 class Window(QWidget):
-    def __init__(self, filename, client):
+    def __init__(self, filename, client, option):
         super().__init__()
         self.setWindowTitle("PyQt5 Media Player")
         self.setGeometry(350, 100, 700, 500)
@@ -24,7 +24,7 @@ class Window(QWidget):
         self.client = client
         self.filename = filename
         self.show()
- 
+        self.option = option
  
     def init_ui(self):
  
@@ -96,7 +96,7 @@ class Window(QWidget):
     
     def teardown(self):
         self.client.send_teardown()
-        self.cap.start = False
+        if self.option: self.cap.start = False
         exit(0)
     def setup(self):
         #filename, _ = QFileDialog.getOpenFileName(self, "Open Video")
@@ -109,7 +109,7 @@ class Window(QWidget):
         if self.client.tempfilepath != '':
             print(self.client.tempfilepath)
             self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(self.client.tempfilepath)))
-            self.cap = Cap(self.client.tempfilepath)
+            if self.option: self.cap = Cap(self.client.tempfilepath)
             
 
     def play_video(self):
@@ -124,8 +124,8 @@ class Window(QWidget):
                 self.handle_file()
                 self.has_load_file = True
             self.mediaPlayer.play()
-            self.cap.start = True
-            self.cap.E_thread()
+            if self.option: self.cap.start = True
+            if self.option: self.cap.E_thread()
             print("playing")
             #TODO: send play
             
@@ -156,15 +156,16 @@ class Window(QWidget):
     def handle_errors(self):
         self.playBtn.setEnabled(False)
         self.label.setText("Error: " + self.mediaPlayer.errorString())
-
+option = None
 filename = sys.argv[1]
+try:
+    option = sys.argv[2]
+except:
+    pass
 app = QApplication(sys.argv)
 client = Client("127.0.0.1", 8888, 5541, filename)
-
-if filename == "stream": 
-    window = ClientWindow(client)
-    window.resize(400, 300)
-    window.show()
-else: window = Window(filename, client)
+if option == "gray":
+    window = Window(filename, client, option)
+else:window = Window(filename, client, None)
 
 sys.exit(app.exec_())
