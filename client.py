@@ -23,6 +23,8 @@ class Client:
         self.has_start = False
         self.is_play = False
         self._rtp_receive_thread = None
+        self.count = 0
+        self.seq = -1
     def rtsp_connect(self):
         if self.rtsp_connected:
             print("already connected")
@@ -98,13 +100,17 @@ class Client:
         temp = None
         while True:
             try:
-                temp = self.rtp.recv(4096)
+                temp = self.rtp.recv(9192)
                 break
             except socket.timeout:
                 pass
-        if temp:
+        if temp:    
             payload = RTPPacket.get_packet_from_bytes(temp).payload
+            seq = RTPPacket.get_packet_from_bytes(temp).sequence_num
+            if seq - self.seq  != 1:print(seq)
+            self.seq = seq
             self.tempfile.write(payload)
+            #print(len(payload))
 
             
 if __name__ == "__main__":
@@ -112,4 +118,5 @@ if __name__ == "__main__":
     #print(c.tempfilepath)
     # c.rtsp_connect()
     # c.send_setup()
+
     
