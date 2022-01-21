@@ -41,8 +41,9 @@ class Server:
             if rtsp_packet.request_type == 'SETUP':
                 self.server_state = "PAUSED"
                 print('State set to PAUSED')
-                self.client_address = (self.client_address[0], int(rtsp_packet.rtp_port))
-                print(f"client: {self.client_address}" )
+                self.client_address = (
+                    self.client_address[0], int(rtsp_packet.rtp_port))
+                print(f"client: {self.client_address}")
                 self.setup_rtp(rtsp_packet.filepath)
                 self.send_rtsp_response(rtsp_packet)
                 break
@@ -89,19 +90,18 @@ class Server:
             w += 1
             rtp_packet = RTPPacket(
                 payload_type=26,
-                sequence_num=w %256,
+                sequence_num=w % 256,
                 time_stamp=123,
                 payload=payload
             )
-            if w % 100 == 0:print(f"Sending packet #{w} to packet #{w+99}")
+            if w % 100 == 0:
+                print(f"Sending packet #{w} to packet #{w+99}")
             #print('Packet header:')
             # rtp_packet.print_header()
             packet = rtp_packet.get_packet()
             self.send_rtp_packet(packet)
             if l > len(buffer):
                 self.state = "FINISH"
-
-            # TODO FINISH
 
     def send_rtp_packet(self, packet):
         try:
