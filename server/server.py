@@ -1,7 +1,9 @@
 import socket
+import cv2
 from typing import Union
 from threading import Thread
 from time import sleep
+from io import BytesIO
 
 from packet.rtsp_packet import RTSPPacket
 from packet.rtp_packet import RTPPacket
@@ -10,8 +12,9 @@ from packet.rtp_packet import RTPPacket
 class Server:
     DEFAULT_CHUNK_SIZE = 4096
     FRAME_SIZE = 4096 - 12
+    CV_FRAME_SIZE = 4096
 
-    def __init__(self, Host, Port):
+    def __init__(self, Host, Port, method):
         self.port = Port
         self.host = Host
         self.connection: Union[None, socket.socket] = None
@@ -19,6 +22,8 @@ class Server:
         self.client_address = None
         self.state = None
         self.source_file = None
+        self.method = None
+        self.cv = cv2.VideoCapture(2)
 
     def connect_client(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,7 +44,7 @@ class Server:
             rtsp_packet = self.rtsp_recv()
             # TODO
             if rtsp_packet.request_type == 'SETUP':
-                self.server_state = "PAUSED"
+                self.state = "PAUSED"
                 print('State set to PAUSED')
                 self.client_address = (
                     self.client_address[0], int(rtsp_packet.rtp_port))
@@ -67,7 +72,10 @@ class Server:
         ##self._video_stream = VideoStream(video_file_path)
         print('Setting up RTP socket...')
         self.rtp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._rtp_send_thread = Thread(target=self.handle_video_send)
+        if self.method == 'cv':
+            self._rtp_send_thread = Thread(target=self.cvcv)
+        else:
+            self._rtp_send_thread = Thread(target=self.handle_video_send)
         self._rtp_send_thread.setDaemon(True)
         self._rtp_send_thread.start()
 
@@ -75,36 +83,44 @@ class Server:
         print(
             f"Sending video to {self.client_address[0]}:{self.client_address[1]}")
         buffer = self.source_file.read()
+        print(len(buffer))
         l = 0
         w = 0
         while True:
-            if self.server_state == 'TEARDOWN' or self.server_state == 'FINISH':
+            if self.state == 'TEARDOWN' or self.state == 'FINISH':
+                print(w)
                 return
-            if self.server_state != 'PLAYING':
+            if self.state != 'PLAYING':
                 sleep(0.5)  # diminish cpu hogging
                 continue
             # TODO
             payload = buffer[l:l+self.FRAME_SIZE]
             l += self.FRAME_SIZE
             # print(w)
-            w += 1
+
             rtp_packet = RTPPacket(
                 payload_type=26,
-                sequence_num=w % 256,
+                sequence_num=w,
                 time_stamp=123,
                 payload=payload
             )
+            sleep(0.1)
             if w % 100 == 0:
                 print(f"Sending packet #{w} to packet #{w+99}")
-            #print('Packet header:')
+            print('Packet header:')
             # rtp_packet.print_header()
+            # sleep(0.000001)
             packet = rtp_packet.get_packet()
             self.send_rtp_packet(packet)
             if l > len(buffer):
                 self.state = "FINISH"
+            w += 1
+
+            # TODO FINISH
 
     def send_rtp_packet(self, packet):
         try:
+            # print(len(packet))
             self.rtp_socket.sendto(
                 packet, self.client_address)
         except socket.error as e:
@@ -118,23 +134,23 @@ class Server:
             packet = self.rtsp_recv()
             # assuming state will only ever be PAUSED or PLAYING at this point
             if packet.request_type == "PLAY":
-                if self.server_state == 'PLAYING':
+                if self.state == 'PLAYING':
                     print('Current state is already PLAYING.')
                     continue
-                self.server_state = 'PLAYING'
+                self.state = 'PLAYING'
                 print('State set to PLAYING.')
             elif packet.request_type == "PAUSE":
-                if self.server_state == 'PAUSED':
+                if self.state == 'PAUSED':
                     print('Current state is already PAUSED.')
                     continue
-                self.server_state = 'PAUSED'
+                self.state = 'PAUSED'
                 print('State set to PAUSED.')
             elif packet.request_type == "TEARDOWN":
                 print('Received TEARDOWN request, shutting down...')
                 self.send_rtsp_response(packet)
                 self.connection.close()
                 self.rtp_socket.close()
-                self.server_state = 'TEARDOWN'
+                self.state = 'TEARDOWN'
                 raise ConnectionError('teardown requested')
             else:
                 pass
@@ -143,3 +159,38 @@ class Server:
     def send_rtsp_response(self, packet):
         response = packet.response_formatter()
         self.connection.send(response.encode())
+
+    def cvcv(self):
+        while True:
+            if self.state == 'TEARDOWN' or self.state == 'FINISH':
+                return
+            if self.state != 'PLAYING':
+                sleep(0.5)  # diminish cpu hogging
+                continue
+            ret, frame = self.cv.read()
+            frame = cv2.resize(frame, (480, 360))
+
+            frame = cv2.resize(frame, (480, 360), interpolation=cv2.INTER_AREA)
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+            success, img_buffer = cv2.imencode('.jpg', frame, encode_param)
+            io_buf = BytesIO(img_buffer)
+            io_buf.seek(0)
+            buffer = io_buf.read()
+            w = 0
+            while l <= len(buffer):
+                payload = buffer[l:l+self.CV_FRAME_SIZE]
+                rtp_packet = RTPPacket(
+                    payload_type=26,
+                    sequence_num=w,
+                    time_stamp=123,
+                    payload=payload
+                )
+                self.send_rtp_packet(rtp_packet)
+                l += self.CV_FRAME_SIZE
+                sleep(1/100)
+
+            sleep(0.1)
+            if w % 100 == 0:
+                print(f"Sending packet #{w} to packet #{w+99}")
+            print('Packet header:')
+            w += 1

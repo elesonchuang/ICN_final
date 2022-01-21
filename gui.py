@@ -97,6 +97,9 @@ class Window(QWidget):
     
     def teardown(self):
         self.client.send_teardown()
+        file = open("temp.mp4", "rb")
+        buffer = file.read()
+        print(len(buffer))
         exit(0)
     def setup(self):
         #filename, _ = QFileDialog.getOpenFileName(self, "Open Video")

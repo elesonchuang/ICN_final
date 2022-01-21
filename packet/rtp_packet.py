@@ -33,6 +33,7 @@ class RTPPacket :
         b4_7 = [(self.time_stamp >> d) & 0xFF for d in range(24, -1, -8)]
         b8_11 = [(self.SSRC >> d) & 0xFF for d in range(24, -1, -8)]
         self.header = bytes((b0, b1, b2, b3, *b4_7, *b8_11))
+        #print(len(self.header))
         #self.header = (b0 << 11) | (b1 << 10) | (b2_3 << 8) | (b4_7 << 4) | b8_11
 
     @classmethod
