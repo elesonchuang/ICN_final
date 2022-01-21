@@ -5,7 +5,7 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtGui import QIcon, QPalette
 from PyQt5.QtCore import Qt, QUrl
- 
+import time
 from client import Client
 
 
@@ -20,7 +20,7 @@ class Window(QWidget):
         p =self.palette()
         p.setColor(QPalette.Window, Qt.black)
         self.setPalette(p)
- 
+        self.has_load_file = False
         self.init_ui()
         self.client = client
         self.filename = filename
@@ -38,10 +38,10 @@ class Window(QWidget):
         videowidget = QVideoWidget()
  
  
-        #create open button
-        openBtn = QPushButton('SETUP')
+        #create buttons
+        self.openBtn = QPushButton('SETUP')
         teardownBtn = QPushButton('TEARDOWN')
-        openBtn.clicked.connect(self.open_file)
+        self.openBtn.clicked.connect(self.setup)
         teardownBtn.clicked.connect(self.teardown)
         
  
@@ -70,7 +70,7 @@ class Window(QWidget):
         hboxLayout.setContentsMargins(0,0,0,0)
  
         #set widgets to the hbox layout
-        hboxLayout.addWidget(openBtn)
+        hboxLayout.addWidget(self.openBtn)
         hboxLayout.addWidget(teardownBtn)
         hboxLayout.addWidget(self.playBtn)
         hboxLayout.addWidget(self.slider)
@@ -97,34 +97,46 @@ class Window(QWidget):
     
     def teardown(self):
         self.client.send_teardown()
- 
-    def open_file(self):
+        exit(0)
+    def setup(self):
         #filename, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        self.client.rtsp_connect()
         self.client.send_setup()
-        if self.filename != '':
-            self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(self.filename)))
-            self.playBtn.setEnabled(True)
- 
- 
+        self.playBtn.setEnabled(True)
+        self.openBtn.setEnabled(False)
+    
+    def handle_file(self):
+        if self.client.tempfilepath != '':
+            print(self.client.tempfilepath)
+            self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(self.client.tempfilepath)))
+            
+
     def play_video(self):
         if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
             self.mediaPlayer.pause()
- 
+            #TODO: send pause
+            self.client.send_pause()
         else:
+            self.client.send_play()
+            print("hehe")
+            if not self.has_load_file:
+                time.sleep(1)
+                self.handle_file()
+                self.has_load_file = True
             self.mediaPlayer.play()
- 
+            print("ok")
+            #TODO: send play
+            
  
     def mediastate_changed(self, state):
         if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
             self.playBtn.setIcon(
                 self.style().standardIcon(QStyle.SP_MediaPause)
-
             )
 
         else:
             self.playBtn.setIcon(
                 self.style().standardIcon(QStyle.SP_MediaPlay)
- 
             )
  
     def position_changed(self, position):
@@ -142,14 +154,11 @@ class Window(QWidget):
     def handle_errors(self):
         self.playBtn.setEnabled(False)
         self.label.setText("Error: " + self.mediaPlayer.errorString())
- 
- 
- 
- 
 
+filename = sys.argv[1]
 app = QApplication(sys.argv)
-client = Client("127.0.0.1", 5540, 5541, "1.mp4")
-window = Window("1.mp4", client)
+client = Client("127.0.0.1", 8888, 5541, filename)
+window = Window(filename, client)
 
 
 

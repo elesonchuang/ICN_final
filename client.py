@@ -1,13 +1,15 @@
 import socket
-from rtsp_packet import RTSPPacket 
+from packet.rtsp_packet import RTSPPacket 
 import sys
-from rtp_packet import RTPPacket
+from packet.rtp_packet import RTPPacket
+from threading import Thread
+import time
 class Client:
     def __init__(self, server_ip: str, server_port: int, rtp_port: int, filepath: str):
         self.server_ip = server_ip
         self.rtsp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.rtp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.rtp.settimeout(0.005)
+        self.rtp.settimeout(0.05)
         self.rtsp.settimeout(0.1)
         self.server_port = server_port
         self.rtsp_connected = False
@@ -15,9 +17,12 @@ class Client:
         self.option = ["SETUP", "TEARDOWN", "PLAY", "PAUSE"]
         self.rtsp_seqnum = 0
         self.session = 123456
-        self.filepath = open(filepath, "wb")
+        self.filepath = filepath
+        self.tempfilepath = "temp."+ self.filepath.split('.')[1]
+        self.tempfile = open(self.tempfilepath, 'wb')
         self.has_start = False
         self.is_play = False
+        self._rtp_receive_thread = None
     def rtsp_connect(self):
         if self.rtsp_connected:
             print("already connected")
@@ -29,13 +34,23 @@ class Client:
         except:
             raise Exception(
                 f'fail to connect rtsp server: {self.server_ip}:{self.server_port}')
+    def _start_rtp_receive_thread(self):
+        self._rtp_receive_thread = Thread(target=self.rtp_connect)
+        self._rtp_receive_thread.setDaemon(True)
+        self._rtp_receive_thread.start()
 
     def rtp_connect(self):
         try:
             self.rtp.bind((self.server_ip, self.rtp_port))
+            print(f"connect rtp:{(self.server_ip, self.rtp_port)}")
         except:
             raise Exception(
                 f"fail to connect rtp server: {self.server_ip}:{self.rtp_port}")
+        while True:
+            if not self.is_play:
+                time.sleep(0.1)  # diminish cpu hogging
+                continue
+            self.get_data()
 
     def send_rtsp_request(self, request):
         '''
@@ -54,14 +69,15 @@ class Client:
     def send_setup(self):
         self.send_rtsp_request("SETUP")
         self.has_start = True
+        self._start_rtp_receive_thread()
 
     def send_play(self):
         self.send_rtsp_request("PLAY")
-        self.has_play = True
+        self.is_play = True
 
     def send_pause(self):
         self.send_rtsp_request("PAUSE")
-        self.has_play = False
+        self.is_play = False
 
     def send_teardown(self):
         self.send_rtsp_request("TEARDOWN")
@@ -88,10 +104,12 @@ class Client:
                 pass
         if temp:
             payload = RTPPacket.get_packet_from_bytes(temp).payload
-            self.filepath.write(payload)
+            self.tempfile.write(payload)
 
             
 if __name__ == "__main__":
     c = Client("127.0.0.1", 5540, 5541, "1.mp4")
-    c.rtsp_connect()
-    c.send_setup()
+    #print(c.tempfilepath)
+    # c.rtsp_connect()
+    # c.send_setup()
+    

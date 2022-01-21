@@ -58,8 +58,9 @@ class RTSPPacket:
         if not match:
             print("fail to parse response...")
             return
+        print(f"get response: {response.decode()}")
         dic = match.groupdict()
-        return self(dic["request_type"], dic["video_file_path"], dic["sequence_number"], dic["dst_port"])
+        return dic
 
 
 if __name__ == "__main__":

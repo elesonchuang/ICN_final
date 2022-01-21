@@ -9,20 +9,21 @@ from packet.rtp_packet import RTPPacket
 
 class Server:
     DEFAULT_CHUNK_SIZE = 4096
-    FRAME_SIZE = 4096
+    FRAME_SIZE = 4096 - 12
 
-    def __init__(self, Port, Host):
+    def __init__(self, Host, Port):
         self.port = Port
         self.host = Host
         self.connection: Union[None, socket.socket] = None
         self.rtp_socket: Union[None, socket.socket] = None
         self.client_address = None
-        self.state = 'INIT'
-        self.source_file = open("videoplayback.mp4", "rb")
+        self.state = None
+        self.source_file = None
 
     def connect_client(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        address = self.host, self.port
+        address = (self.host, self.port)
+        print(address)
         s.bind(address)
         print(f"Listening on {address[0]}:{address[1]}...")
         s.listen(1)
@@ -40,7 +41,8 @@ class Server:
             if rtsp_packet.request_type == 'SETUP':
                 self.server_state = "PAUSED"
                 print('State set to PAUSED')
-                self.client_address = self.client_address[0], rtsp_packet.rtp_port
+                self.client_address = (self.client_address[0], int(rtsp_packet.rtp_port))
+                print(f"client: {self.client_address}" )
                 self.setup_rtp(rtsp_packet.filepath)
                 self.send_rtsp_response(rtsp_packet)
                 break
@@ -60,6 +62,7 @@ class Server:
 
     def setup_rtp(self, video_file_path: str):
         print(f"Opening up video stream for file {video_file_path}")
+        self.source_file = open(video_file_path, "rb")
         ##self._video_stream = VideoStream(video_file_path)
         print('Setting up RTP socket...')
         self.rtp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -86,30 +89,27 @@ class Server:
             w += 1
             rtp_packet = RTPPacket(
                 payload_type=26,
-                sequence_num=l,
+                sequence_num=w %256,
                 time_stamp=123,
                 payload=payload
             )
-            print(f"Sending packet #{l}")
-            print('Packet header:')
+            if w % 100 == 0:print(f"Sending packet #{w} to packet #{w+99}")
+            #print('Packet header:')
             # rtp_packet.print_header()
             packet = rtp_packet.get_packet()
             self.send_rtp_packet(packet)
-            sleep(0.0001)
             if l > len(buffer):
                 self.state = "FINISH"
 
             # TODO FINISH
 
     def send_rtp_packet(self, packet):
-        while packet:
-            try:
-                self.rtp_socket.sendto(
-                    packet[:self.DEFAULT_CHUNK_SIZE], self.client_address)
-            except socket.error as e:
-                print(f"failed to send rtp packet: {e}")
-                return
-            packet = packet[self.DEFAULT_CHUNK_SIZE:]
+        try:
+            self.rtp_socket.sendto(
+                packet, self.client_address)
+        except socket.error as e:
+            print(f"failed to send rtp packet: {e}")
+            return
 
     def handle_rtsp_requests(self):
         print("Waiting for RTSP requests...")
